@@ -1,0 +1,6 @@
+﻿[dbo].[UserBasic].[Sid] 取值范围 [dbo].[AlarmSubstation].[Sid]
+[dbo].[UserFacility].[Uid] 取值范围 [dbo].[UserBasic].[Uid]
+[dbo].[UserContacter].[Uid] 取值范围 [dbo].[UserBasic].[Uid]
+[dbo].[UserFacility].[Fic] 取值范围 [dbo].[AlarmFacility].[Aid]
+
+[dbo].[UserContacter].[Cid] 取值范围 [dbo].[Contacter].[Cid]
