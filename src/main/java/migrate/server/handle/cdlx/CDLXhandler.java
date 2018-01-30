@@ -791,7 +791,7 @@ public class CDLXhandler implements Handler {
 				
 				customerattrMap.put("userId", userId);
 				customerattrMap.put("userAddr", userBasic.get("Uaddress").toString());
-				customerattrMap.put("userProperty", "0");// 默认已注册
+				customerattrMap.put("userProperty", "1");// 默认已注册
 
 				String uType = userBasic.get("Utype").toString();
 
