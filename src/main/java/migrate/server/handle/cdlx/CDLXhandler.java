@@ -707,7 +707,8 @@ public class CDLXhandler implements Handler {
 	 */
 	private void handleUsercont(String userId,String uid) {
 
-		List<Map> userContacters = SqlServerDatabase.getDb().findAll("select top 1 * from UserContacter");
+		List<Map> userContacters = SqlServerDatabase.getDb().findAll("select top 1 * from UserContacter where Uid=?",
+				uid);
 
 		if (Objects.isNull(userContacters)) {
 			LOGGER.info("用户  {} 无联系人 ...", uid);
