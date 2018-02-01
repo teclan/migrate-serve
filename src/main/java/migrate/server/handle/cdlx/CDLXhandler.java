@@ -155,6 +155,7 @@ public class CDLXhandler implements Handler {
 		sb.append(String.format(sql, "imm_netnvrattr", "devId", Objects.Joiner("','", devIds)));
 		sb.append(String.format(sql, "imm_camera", "devId", Objects.Joiner("','", devIds)));
 		sb.append(String.format(sql, "imm_one_click_dev_attr", "devId", Objects.Joiner("','", devIds)));
+		sb.append(String.format(sql, "imm_sub_sys_of_alarm_host", "devId", Objects.Joiner("','", devIds)));
 
 		FileUtils.writeFile("回滚脚本.sql", sb.toString());
 
@@ -576,7 +577,7 @@ public class CDLXhandler implements Handler {
 				// 设备型号是LX9201、LX90202的，是一键式报警设备+视频
 				if ("LX9201".equals(TnameString) || "LX9202".equals(TnameString)) {
 					devInfoMap.put("devType", 15);
-					devId = "80003" + (nnumber.length() > 4 ? nnumber.substring(nnumber.length() - 4, nnumber.length())
+					devId = "80000" + (nnumber.length() > 4 ? nnumber.substring(nnumber.length() - 4, nnumber.length())
 							: nnumber);
 
 					ownerId = "80000"
@@ -684,6 +685,8 @@ public class CDLXhandler implements Handler {
 										SqlGenerateUtils.generateSqlForInsert(alarmhostattrMap)),
 										SqlGenerateUtils.getInsertValues(alarmhostattrMap));
 						handleDevZone(devId, aid);
+
+						addSubSys(devId);
 					} else {
 						MysqlDatabase.getDb()
 								.exec(String.format(INSERT_SQL, "imm_one_click_dev_attr",
@@ -700,6 +703,29 @@ public class CDLXhandler implements Handler {
 
 			LOGGER.info("第 {} 页处理完成 ...", page);
 		}
+	}
+
+	/**
+	 * 添加子系统
+	 */
+	private void addSubSys(String devId) {
+
+		Map<String, Object> subSysMap = new HashMap<String, Object>();
+		subSysMap.put("devId", devId);
+		subSysMap.put("subSysId", "01");
+		subSysMap.put("dataFrom", PLATFORM_ID);
+		subSysMap.put("subRange", "");
+		subSysMap.put("fMemo", "");
+
+		try {
+		MysqlDatabase.getDb()
+				.exec(String.format(INSERT_SQL, "imm_sub_sys_of_alarm_host",
+						SqlGenerateUtils.generateSqlForInsert(subSysMap)), SqlGenerateUtils.getInsertValues(subSysMap));
+
+		} catch (Exception e) {
+			LOGGER.error(e.getMessage(), e);
+		}
+
 	}
 
 	/**
