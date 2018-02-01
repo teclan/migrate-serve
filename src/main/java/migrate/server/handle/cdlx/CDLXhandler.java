@@ -103,13 +103,19 @@ public class CDLXhandler implements Handler {
 		businessMap.put("诊所", "卫生");
 		businessMap.put("网店", "个人");
 		businessMap.put("典当行", "个人");
-		businessMap.put("旅馆", "宾馆、饭店	");
+		businessMap.put("旅馆", "宾馆、饭店");
 		businessMap.put("店铺医药", "药店");
-		businessMap.put("休闲娱乐", "餐饮、娱乐	");
+		businessMap.put("休闲娱乐", "餐饮、娱乐");
 		businessMap.put("养鸡场", "个人");
-		businessMap.put("娱乐", "餐饮、娱乐	");
+		businessMap.put("娱乐", "餐饮、娱乐");
 		businessMap.put("个人家庭", "个人");
 		businessMap.put("旅店", "宾馆、饭店	");
+
+		businessMap.put("养殖业", "个人");
+		businessMap.put("茶叶", "门市");
+		businessMap.put("歌厅", "餐饮、娱乐");
+		businessMap.put("医疗", "卫生");
+		businessMap.put("商铺", "门市");
 
 	}
 
