@@ -250,6 +250,7 @@ public class CDLXhandler implements Handler {
 			cameraMap.put("dataFrom", PLATFORM_ID);
 			cameraMap.put("relateNVR", relateNVR);
 			cameraMap.put("devMonitorId", "000" + i);
+			cameraMap.put("videoServer", VEDIO_SERVER);
 
 			// 设备基本信息
 			devInfoMap.put("devId", devId);
