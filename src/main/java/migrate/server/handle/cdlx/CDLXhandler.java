@@ -393,10 +393,129 @@ public class CDLXhandler implements Handler {
 	}
 
 	/**
+	 * 处理一键报警防区
+	 * 
+	 * 
+	 * 给目前所有一键式设备添加一个0000设备防区。然后在它的机主里面，加个0099用户防区，并且配置上联动。联动这个机主所有的监控点
+	 * 
+	 */
+
+	@SuppressWarnings("rawtypes")
+	private void handleDevZoneForOneClick(String devId, String aid) {
+		String ownerId = devId;
+
+
+		List<Map> facilityModules = SqlServerDatabase.getDb().findAll("select top 1 * from FacilityModule where Aid=?",
+				aid);
+
+		if (Objects.isNull(facilityModules)) {
+			LOGGER.info("一键报警 {} 在 主机-模块关联表未找到匹配项...", aid);
+			return;
+		}
+		String mid = facilityModules.get(0).get("Mid").toString();
+
+		List<Map> defences = SqlServerDatabase.getDb().findAll("select * from Defence where Mid=?", mid);
+
+		for (Map map : defences) {
+
+			Map<String, Object> devzoneMap = new HashMap<String, Object>();
+
+			devzoneMap.put("devId", devId);
+
+			String devZoneId = "0000";
+
+			devzoneMap.put("devZoneId", devZoneId);
+
+			List<Map> dnames = SqlServerDatabase.getDb().findAll("select top 1 * from DefenceType where DTid=?",
+					map.get("Dtypeid"));
+
+			if (Objects.isNull(dnames)) {
+				LOGGER.info("SQLServer 报警主机 aid:{} 在 DefenceType 表未找到匹配项...", aid);
+				continue;
+			}
+
+			List<Map> snModels = MysqlDatabase.getDb().findAll("select * from imm_snmodel where snModelName=?",
+					dnames.get(0).get("Dname"));
+
+			int snModeId = 132;
+			if (Objects.isNull(snModels)) {
+				snModelNotFound.add(dnames.get(0).get("Dname").toString());
+			} else {
+				snModeId = (Integer) snModels.get(0).get("snModelId");
+			}
+
+			devzoneMap.put("snModeId", snModeId);
+
+			devzoneMap.put("atPos", map.get("Dsite"));
+			// devzoneMap.put("almType", -1);
+			devzoneMap.put("snNum", map.get("Dcount"));
+			// devzoneMap.put("snType", -1);
+			devzoneMap.put("instDate", CREATE_DATE);
+			devzoneMap.put("liveDate", CREATE_DATE);
+			devzoneMap.put("updatetime", CREATE_DATE);
+			devzoneMap.put("syncTime", CREATE_DATE);
+			devzoneMap.put("dataFrom", PLATFORM_ID);
+
+			Map<String, Object> ownerZoneMap = new HashMap<String, Object>();
+			ownerZoneMap.put("ownerId", ownerId);
+			ownerZoneMap.put("devId", devId);
+			ownerZoneMap.put("devZoneId", devZoneId);
+			ownerZoneMap.put("ownerZoneName", "0099");
+			ownerZoneMap.put("snModelId", devzoneMap.get("snModeId"));
+			ownerZoneMap.put("x", devzoneMap.get("x"));
+			ownerZoneMap.put("y", devzoneMap.get("y"));
+			ownerZoneMap.put("syncTime", devzoneMap.get("syncTime"));
+			ownerZoneMap.put("updatetime", devzoneMap.get("updatetime"));
+			ownerZoneMap.put("fMemo", devzoneMap.get("fMemo"));
+			ownerZoneMap.put("dataFrom", devzoneMap.get("dataFrom"));
+
+			// cameraIdList
+			// 事件配置
+			Map<String, Object> ownerevtrecordMap = new HashMap<String, Object>();
+			ownerevtrecordMap.put("UserEvtId", getNextUserEventId());
+			ownerevtrecordMap.put("ownerId", ownerId);
+			ownerevtrecordMap.put("ZoneCHFlag", 0);
+			ownerevtrecordMap.put("ZoneCHValue", "0099");
+			ownerevtrecordMap.put("isVideo", 1);
+
+			String sql = " select devId from imm_camera where relateNVR in ( select devId from imm_devinfo where ownerId='%s' and devType=10 )";
+			List<Map> camares = MysqlDatabase.getDb()
+					.findAll(String.format(sql, ownerId));
+			List<String> cameraIds = new ArrayList<String>();
+
+			for (Map m : camares) {
+				cameraIds.add(m.get("devId").toString());
+			}
+			ownerevtrecordMap.put("cameraIdList", Objects.Joiner(";", cameraIds));
+
+			try {
+				MysqlDatabase.getDb().exec(
+						String.format(INSERT_SQL, "imm_devzone", SqlGenerateUtils.generateSqlForInsert(devzoneMap)),
+						SqlGenerateUtils.getInsertValues(devzoneMap));
+
+				MysqlDatabase.getDb().exec(
+						String.format(INSERT_SQL, "imm_ownerzone", SqlGenerateUtils.generateSqlForInsert(ownerZoneMap)),
+						SqlGenerateUtils.getInsertValues(ownerZoneMap));
+
+				MysqlDatabase.getDb()
+						.exec(String.format(INSERT_SQL, "imm_ownerevtrecord",
+								SqlGenerateUtils.generateSqlForInsert(ownerevtrecordMap)),
+								SqlGenerateUtils.getInsertValues(ownerevtrecordMap));
+
+			} catch (Exception e) {
+				LOGGER.info("aid={}  mid={}", aid, mid);
+				LOGGER.error(e.getMessage(), e);
+			}
+
+			break;
+		}
+	}
+
+	/**
 	 * 处理报警主机防区
 	 */
 	@SuppressWarnings("rawtypes")
-	private void handleDevZone(String devId, String aid) {
+	private void handleDevZoneForAlarmHost(String devId, String aid) {
 
 		String ownerId = devId;
 
@@ -473,7 +592,7 @@ public class CDLXhandler implements Handler {
 			Map<String, Object> ownerevtrecordMap = new HashMap<String, Object>();
 			ownerevtrecordMap.put("UserEvtId", getNextUserEventId());
 			ownerevtrecordMap.put("ownerId", ownerId);
-			ownerevtrecordMap.put("ZoneCHFlag", 1);
+			ownerevtrecordMap.put("ZoneCHFlag", 0);
 			ownerevtrecordMap.put("ZoneCHValue", devZoneId);
 			ownerevtrecordMap.put("isVideo", 1);
 
@@ -584,23 +703,21 @@ public class CDLXhandler implements Handler {
 				// 设备型号是LX9201、LX90202的，是一键式报警设备+视频
 				if ("LX9201".equals(TnameString) || "LX9202".equals(TnameString)) {
 					devInfoMap.put("devType", 15);
-					devId = "80000" + (nnumber.length() > 4 ? nnumber.substring(nnumber.length() - 4, nnumber.length())
-							: nnumber);
-
-					ownerId = "80000"
-							+ (nnumber.length() > 4 ? nnumber.substring(nnumber.length() - 4, nnumber.length())
-									: nnumber);
-
 					// devName ,"报警主机："+UserBasic.Uname
 					devName = "一键报警：" + userBasic.get("Uname");
 				} else {
 					devInfoMap.put("devType", 1);
-					devId = "80000" + (nnumber.length() > 4 ? nnumber.substring(nnumber.length() - 4, nnumber.length())
-							: nnumber);
 					// devName ,"报警主机："+UserBasic.Uname
 					devName = "报警主机：" + userBasic.get("Uname");
 
-					ownerId = devId;
+				}
+
+				devId = "80000"
+						+ (nnumber.length() > 4 ? nnumber.substring(nnumber.length() - 4, nnumber.length()) : nnumber);
+				ownerId = devId;
+
+				if ("800000752".equals(devId)) {
+					System.err.println(devId);
 				}
 
 				devInfoMap.put("devId", devId);
@@ -691,7 +808,7 @@ public class CDLXhandler implements Handler {
 								.exec(String.format(INSERT_SQL, "imm_alarmhostattr",
 										SqlGenerateUtils.generateSqlForInsert(alarmhostattrMap)),
 										SqlGenerateUtils.getInsertValues(alarmhostattrMap));
-						handleDevZone(devId, aid);
+						handleDevZoneForAlarmHost(devId, aid);
 
 						addSubSys(devId);
 					} else {
@@ -699,6 +816,8 @@ public class CDLXhandler implements Handler {
 								.exec(String.format(INSERT_SQL, "imm_one_click_dev_attr",
 										SqlGenerateUtils.generateSqlForInsert(oneClickattrMap)),
 										SqlGenerateUtils.getInsertValues(oneClickattrMap));
+
+						handleDevZoneForOneClick(devId, aid);
 					}
 
 					devIds.add(devId);
@@ -844,7 +963,7 @@ public class CDLXhandler implements Handler {
 					business = businesses.get(0);
 				}
 
-				customerattrMap.put("businessId", business.get("Id")); // 根据Utype转换
+				customerattrMap.put("businessId", business.get("businessId")); // 根据Utype转换
 				customerattrMap.put("businessName", business.get("businessName")); // 根据Utype转换
 
 				customerattrMap.put("isHost", 1);
