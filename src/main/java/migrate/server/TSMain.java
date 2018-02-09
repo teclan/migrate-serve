@@ -1,25 +1,24 @@
 package migrate.server;
 
-
 import java.io.Console;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import migrate.server.handle.Handler;
-import migrate.server.handle.cdlx.CDLXhandler;
+import migrate.server.handle.cdlx.CDLXhandlerForTS;
 import migrate.server.mysql.MysqlDatabase;
 import migrate.server.sqlserver.SqlServerDatabase;
 
-public class Main {
-	private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
+public class TSMain {
+	private static final Logger LOGGER = LoggerFactory.getLogger(TSMain.class);
 
 	public static void main(String[] args) {
 
 		SqlServerDatabase.openDatabase();
 		MysqlDatabase.openDatabase();
 
-		Handler handler = new CDLXhandler();
+		Handler handler = new CDLXhandlerForTS();
 		handler.handle();
 		handler.showNotFoundDic();
 		handler.getRollbackSql();
@@ -37,7 +36,5 @@ public class Main {
 		while (cs.readLine() != null) {
 			System.exit(0);
 		}
-
 	}
-
 }

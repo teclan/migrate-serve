@@ -24,7 +24,7 @@ import migrate.server.utils.Objects;
 import migrate.server.utils.SqlGenerateUtils;
 
 /**
- * 成都理想的迁移逻辑
+ * 成都理想（石家庄）的迁移逻辑
  * 
  * @author teclan
  * 
@@ -32,8 +32,8 @@ import migrate.server.utils.SqlGenerateUtils;
  *
  *         2018年1月24日
  */
-public class CDLXhandler implements Handler {
-	private static final Logger LOGGER = LoggerFactory.getLogger(CDLXhandler.class);
+public class CDLXhandlerForSJZ implements Handler {
+	private static final Logger LOGGER = LoggerFactory.getLogger(CDLXhandlerForSJZ.class);
 	private final static SimpleDateFormat DATE_FORMAT_TO_DAY = new SimpleDateFormat("yyyy-MM-dd");
 
 	// 指定每页大小为 1000
@@ -234,8 +234,8 @@ public class CDLXhandler implements Handler {
 			String devTUTKID = Objects.isNullString(lxCamare.get("CloudID")) ? "" : lxCamare.get("CloudID").toString();
 			String devLoginName = Objects.isNullString(lxCamare.get("Cuser")) ? "" : lxCamare.get("Cuser").toString();
 			String devLoginPwd = Objects.isNullString(lxCamare.get("Cpwd")) ? "" : lxCamare.get("Cpwd").toString();
-			String videoUrlSufString = ":9000/" + devTUTKID + ":0:P2P_NPC:" + i + ":1:"
-					+ devLoginName + ":" + devLoginPwd + "/av_stream";
+			String videoUrlSufString = ":9000/" + devTUTKID + ":0:P2P_NPC:" + i + ":1:" + devLoginName + ":"
+					+ devLoginPwd + "/av_stream";
 
 			String devId = getNextCameraDevId();
 
@@ -274,7 +274,6 @@ public class CDLXhandler implements Handler {
 			ownermonitorMap.put("devId", relateNVR);
 			ownermonitorMap.put("devMonitorId", "000" + i);
 			ownermonitorMap.put("ownerMonitorId", "000" + i);
-
 
 			try {
 				MysqlDatabase.getDb().exec(
@@ -404,9 +403,7 @@ public class CDLXhandler implements Handler {
 	private void handleDevZoneForOneClick(String devId, String aid) {
 		String ownerId = devId;
 
-
-		List<Map> facilityModules = SqlServerDatabase.getDb().findAll("select top 1 * from FacilityModule where Aid=?",
-				aid);
+		List<Map> facilityModules = SqlServerDatabase.getDb().findAll("select  * from FacilityModule where Aid=?", aid);
 
 		if (Objects.isNull(facilityModules)) {
 			LOGGER.info("一键报警 {} 在 主机-模块关联表未找到匹配项...", aid);
@@ -479,8 +476,7 @@ public class CDLXhandler implements Handler {
 			ownerevtrecordMap.put("isVideo", 1);
 
 			String sql = " select devId from imm_camera where relateNVR in ( select devId from imm_devinfo where ownerId='%s' and devType=10 )";
-			List<Map> camares = MysqlDatabase.getDb()
-					.findAll(String.format(sql, ownerId));
+			List<Map> camares = MysqlDatabase.getDb().findAll(String.format(sql, ownerId));
 			List<String> cameraIds = new ArrayList<String>();
 
 			for (Map m : camares) {
@@ -519,112 +515,129 @@ public class CDLXhandler implements Handler {
 
 		String ownerId = devId;
 
-		List<Map> facilityModules = SqlServerDatabase.getDb().findAll("select top 1 * from FacilityModule where Aid=?",
-				aid);
+		List<Map> facilityModules = SqlServerDatabase.getDb().findAll("select  * from FacilityModule where Aid=?", aid);
 
 		if (Objects.isNull(facilityModules)) {
 			LOGGER.info("报警主机 {} 在 主机-模块关联表未找到匹配项...", aid);
 			return;
 		}
-		String mid = facilityModules.get(0).get("Mid").toString();
 
-		List<Map> defences = SqlServerDatabase.getDb().findAll("select * from Defence where Mid=?", mid);
+		String mid = "";
+		String devZonePre = "";
+		String devZoneSuffix = "";
+		String devZoneId = "";
 
-		for (Map map : defences) {
+		for (Map facilityModule : facilityModules) {
 
-			Map<String, Object> devzoneMap = new HashMap<String, Object>();
+			mid = facilityModule.get("Mid").toString();
 
-			devzoneMap.put("devId", devId);
+			List<Map> pres = SqlServerDatabase.getDb()
+					.findAll("select top 1 * from FModule where Mid =?", mid);
 
-			String devZoneId = map.get("Dnumber").toString();
+			devZonePre = pres.get(0).get("Mnumber").toString().substring(1);
 
-			// 位数不够4位，在前面补 0
-			while (devZoneId.length() < 4) {
-				devZoneId = "0" + devZoneId;
+			List<Map> defences = SqlServerDatabase.getDb()
+					.findAll("select * from Defence where Mid =?", mid);
+
+
+			for (Map map : defences) {
+
+				Map<String, Object> devzoneMap = new HashMap<String, Object>();
+
+				devzoneMap.put("devId", devId);
+
+				devZoneId = map.get("Dnumber").toString();
+
+				devZoneSuffix = map.get("Dnumber").toString().substring(1);
+
+				devZoneId = devZonePre + devZoneSuffix;
+
+				devzoneMap.put("devZoneId", devZoneId);
+
+				List<Map> dnames = SqlServerDatabase.getDb().findAll("select top 1 * from DefenceType where DTid=?",
+						map.get("Dtypeid"));
+
+				if (Objects.isNull(dnames)) {
+					LOGGER.info("SQLServer 报警主机 aid:{} 在 DefenceType 表未找到匹配项...", aid);
+					continue;
+				}
+
+				List<Map> snModels = MysqlDatabase.getDb().findAll("select * from imm_snmodel where snModelName=?",
+						dnames.get(0).get("Dname"));
+
+				int snModeId = 132;
+				if (Objects.isNull(snModels)) {
+					snModelNotFound.add(dnames.get(0).get("Dname").toString());
+				} else {
+					snModeId = (Integer) snModels.get(0).get("snModelId");
+				}
+
+				devzoneMap.put("snModeId", snModeId);
+
+				devzoneMap.put("atPos", map.get("Dsite"));
+				// devzoneMap.put("almType", -1);
+				devzoneMap.put("snNum", map.get("Dcount"));
+				// devzoneMap.put("snType", -1);
+				devzoneMap.put("instDate", CREATE_DATE);
+				devzoneMap.put("liveDate", CREATE_DATE);
+				devzoneMap.put("updatetime", CREATE_DATE);
+				devzoneMap.put("syncTime", CREATE_DATE);
+				devzoneMap.put("dataFrom", PLATFORM_ID);
+
+				Map<String, Object> ownerZoneMap = new HashMap<String, Object>();
+				ownerZoneMap.put("ownerId", ownerId);
+				ownerZoneMap.put("devId", devId);
+				ownerZoneMap.put("devZoneId", devZoneId);
+				ownerZoneMap.put("ownerZoneName", devZoneId);
+				ownerZoneMap.put("snModelId", devzoneMap.get("snModeId"));
+				ownerZoneMap.put("x", devzoneMap.get("x"));
+				ownerZoneMap.put("y", devzoneMap.get("y"));
+				ownerZoneMap.put("syncTime", devzoneMap.get("syncTime"));
+				ownerZoneMap.put("updatetime", devzoneMap.get("updatetime"));
+				ownerZoneMap.put("fMemo", devzoneMap.get("fMemo"));
+				ownerZoneMap.put("dataFrom", devzoneMap.get("dataFrom"));
+
+				// cameraIdList
+				// 事件配置
+				Map<String, Object> ownerevtrecordMap = new HashMap<String, Object>();
+				ownerevtrecordMap.put("UserEvtId", getNextUserEventId());
+				ownerevtrecordMap.put("ownerId", ownerId);
+				ownerevtrecordMap.put("ZoneCHFlag", 0);
+				ownerevtrecordMap.put("ZoneCHValue", devZoneId);
+				ownerevtrecordMap.put("isVideo", 1);
+
+				String[] channels = map.get("Channel") == null ? new String[] {}
+						: map.get("Channel").toString().split(",");
+				String sql = " select devId from imm_camera where relateNVR in ( select devId from imm_devinfo where ownerId='%s' and devType=10 ) and devChannelId in ('%s')";
+				List<Map> camares = MysqlDatabase.getDb()
+						.findAll(String.format(sql, ownerId, Objects.Joiner("','", channels)));
+				List<String> cameraIds = new ArrayList<String>();
+
+				for (Map m : camares) {
+					cameraIds.add(m.get("devId").toString());
+				}
+				ownerevtrecordMap.put("cameraIdList", Objects.Joiner(";", cameraIds));
+
+				try {
+					MysqlDatabase.getDb().exec(
+							String.format(INSERT_SQL, "imm_devzone", SqlGenerateUtils.generateSqlForInsert(devzoneMap)),
+							SqlGenerateUtils.getInsertValues(devzoneMap));
+
+					MysqlDatabase.getDb()
+							.exec(String.format(INSERT_SQL, "imm_ownerzone",
+									SqlGenerateUtils.generateSqlForInsert(ownerZoneMap)),
+									SqlGenerateUtils.getInsertValues(ownerZoneMap));
+
+					MysqlDatabase.getDb()
+							.exec(String.format(INSERT_SQL, "imm_ownerevtrecord",
+									SqlGenerateUtils.generateSqlForInsert(ownerevtrecordMap)),
+									SqlGenerateUtils.getInsertValues(ownerevtrecordMap));
+
+				} catch (Exception e) {
+					LOGGER.error(e.getMessage(), e);
+				}
 			}
-			devzoneMap.put("devZoneId", devZoneId);
 
-			List<Map> dnames = SqlServerDatabase.getDb().findAll("select top 1 * from DefenceType where DTid=?",
-					map.get("Dtypeid"));
-
-			if (Objects.isNull(dnames)) {
-				LOGGER.info("SQLServer 报警主机 aid:{} 在 DefenceType 表未找到匹配项...", aid);
-				continue;
-			}
-			
-			List<Map> snModels = MysqlDatabase.getDb().findAll("select * from imm_snmodel where snModelName=?",
-					dnames.get(0).get("Dname"));
-
-			int snModeId = 132;
-			if (Objects.isNull(snModels)) {
-				snModelNotFound.add(dnames.get(0).get("Dname").toString());
-			} else {
-				snModeId = (Integer) snModels.get(0).get("snModelId");
-			}
-
-			devzoneMap.put("snModeId", snModeId);
-
-			devzoneMap.put("atPos", map.get("Dsite"));
-			// devzoneMap.put("almType", -1);
-			devzoneMap.put("snNum", map.get("Dcount"));
-			// devzoneMap.put("snType", -1);
-			devzoneMap.put("instDate", CREATE_DATE);
-			devzoneMap.put("liveDate", CREATE_DATE);
-			devzoneMap.put("updatetime", CREATE_DATE);
-			devzoneMap.put("syncTime", CREATE_DATE);
-			devzoneMap.put("dataFrom", PLATFORM_ID);
-
-			Map<String, Object> ownerZoneMap = new HashMap<String, Object>();
-			ownerZoneMap.put("ownerId", ownerId);
-			ownerZoneMap.put("devId", devId);
-			ownerZoneMap.put("devZoneId", devZoneId);
-			ownerZoneMap.put("ownerZoneName", devZoneId);
-			ownerZoneMap.put("snModelId", devzoneMap.get("snModeId"));
-			ownerZoneMap.put("x", devzoneMap.get("x"));
-			ownerZoneMap.put("y", devzoneMap.get("y"));
-			ownerZoneMap.put("syncTime", devzoneMap.get("syncTime"));
-			ownerZoneMap.put("updatetime", devzoneMap.get("updatetime"));
-			ownerZoneMap.put("fMemo", devzoneMap.get("fMemo"));
-			ownerZoneMap.put("dataFrom", devzoneMap.get("dataFrom"));
-
-			// cameraIdList
-			// 事件配置
-			Map<String, Object> ownerevtrecordMap = new HashMap<String, Object>();
-			ownerevtrecordMap.put("UserEvtId", getNextUserEventId());
-			ownerevtrecordMap.put("ownerId", ownerId);
-			ownerevtrecordMap.put("ZoneCHFlag", 0);
-			ownerevtrecordMap.put("ZoneCHValue", devZoneId);
-			ownerevtrecordMap.put("isVideo", 1);
-
-			String[] channels = map.get("Channel") == null ? new String[] {} : map.get("Channel").toString().split(",");
-			String sql = " select devId from imm_camera where relateNVR in ( select devId from imm_devinfo where ownerId='%s' and devType=10 ) and devChannelId in ('%s')";
-			List<Map> camares = MysqlDatabase.getDb()
-					.findAll(String.format(sql, ownerId, Objects.Joiner("','", channels)));
-			List<String> cameraIds = new ArrayList<String>();
-
-			for (Map m : camares) {
-				cameraIds.add(m.get("devId").toString());
-			}
-			ownerevtrecordMap.put("cameraIdList", Objects.Joiner(";", cameraIds));
-
-			try {
-				MysqlDatabase.getDb().exec(
-					String.format(INSERT_SQL, "imm_devzone", SqlGenerateUtils.generateSqlForInsert(devzoneMap)),
-					SqlGenerateUtils.getInsertValues(devzoneMap));
-
-				MysqlDatabase.getDb().exec(
-						String.format(INSERT_SQL, "imm_ownerzone", SqlGenerateUtils.generateSqlForInsert(ownerZoneMap)),
-						SqlGenerateUtils.getInsertValues(ownerZoneMap));
-
-				MysqlDatabase.getDb()
-						.exec(String.format(INSERT_SQL, "imm_ownerevtrecord",
-								SqlGenerateUtils.generateSqlForInsert(ownerevtrecordMap)),
-								SqlGenerateUtils.getInsertValues(ownerevtrecordMap));
-
-			} catch (Exception e) {
-				LOGGER.info("aid={}  mid={}", aid, mid);
-				LOGGER.error(e.getMessage(), e);
-			}
 		}
 	}
 
@@ -673,15 +686,13 @@ public class CDLXhandler implements Handler {
 					continue;
 				}
 
-
 				Object Tname = SqlServerDatabase.getDb().firstColumn("select top 1 Tname from Fmodel where Tid=?",
 						map.get("Tid"));
 
 				String TnameString = ((List) Tname).get(0).toString().trim();
 
-				List<Map> devModels = MysqlDatabase.getDb()
-						.findAll("select * from imm_devmodel where devModelName=?",
-								TnameString);
+				List<Map> devModels = MysqlDatabase.getDb().findAll("select * from imm_devmodel where devModelName=?",
+						TnameString);
 
 				String devModelId = "";
 				if (Objects.isNull(devModels)) {
@@ -741,7 +752,7 @@ public class CDLXhandler implements Handler {
 				devInfoMap.put("devInstDate", instDate);
 				devInfoMap.put("devState", 2);
 				devInfoMap.put("instMan", "");
-				
+
 				String cid = map.get("Cid") == null ? "" : map.get("Cid").toString();
 
 				List<Map> constructs = SqlServerDatabase.getDb().findAll("select * from Construct where Cid=?", cid);
@@ -763,7 +774,6 @@ public class CDLXhandler implements Handler {
 				devInfoMap.put("controlType", "both");
 				devInfoMap.put("dataFrom", PLATFORM_ID);
 				devInfoMap.put("platformId", PLATFORM_ID);
-
 
 				if (devInfoMap.get("devType") == Integer.valueOf(1)) {
 					alarmhostattrMap.put("devId", devId);
@@ -844,9 +854,10 @@ public class CDLXhandler implements Handler {
 		subSysMap.put("fMemo", "");
 
 		try {
-		MysqlDatabase.getDb()
-				.exec(String.format(INSERT_SQL, "imm_sub_sys_of_alarm_host",
-						SqlGenerateUtils.generateSqlForInsert(subSysMap)), SqlGenerateUtils.getInsertValues(subSysMap));
+			MysqlDatabase.getDb()
+					.exec(String.format(INSERT_SQL, "imm_sub_sys_of_alarm_host",
+							SqlGenerateUtils.generateSqlForInsert(subSysMap)),
+							SqlGenerateUtils.getInsertValues(subSysMap));
 
 		} catch (Exception e) {
 			LOGGER.error(e.getMessage(), e);
@@ -857,7 +868,7 @@ public class CDLXhandler implements Handler {
 	/**
 	 * 处理联系人
 	 */
-	private void handleUsercont(String userId,String uid) {
+	private void handleUsercont(String userId, String uid) {
 
 		List<Map> userContacters = SqlServerDatabase.getDb().findAll("select top 1 * from UserContacter where Uid=?",
 				uid);
@@ -869,14 +880,13 @@ public class CDLXhandler implements Handler {
 		Map<String, Object> UserContacterMap = userContacters.get(0);
 		String cid = UserContacterMap.get("cid").toString();
 
-
 		List<Map> contacters = SqlServerDatabase.getDb().findAll("select * from Contacter where cid=?", cid);
 
 		int contId = 1;
 
 		for (Map map : contacters) {
-			
-			Map<String,Object> usercontMap = new HashMap<String,Object>();
+
+			Map<String, Object> usercontMap = new HashMap<String, Object>();
 			usercontMap.put("userId", userId);
 			usercontMap.put("contId", contId);
 			usercontMap.put("cName", map.get("Contacter"));
@@ -910,22 +920,21 @@ public class CDLXhandler implements Handler {
 
 			int offset = (page - 1) * LIMIT;
 
-			List<Map> userBasics = SqlServerDatabase.getDb().findAll(
-					"select top " + LIMIT + " * from UserBasic where Uid not in (select top " + offset
-							+ " Uid from UserBasic) ");
+			List<Map> userBasics = SqlServerDatabase.getDb().findAll("select top " + LIMIT
+					+ " * from UserBasic where Uid not in (select top " + offset + " Uid from UserBasic) ");
 
 			for (Map userBasic : userBasics) {
 
 				// 80000+Unumber后四位
 				String unumber = userBasic.get("Unumber").toString();
-				
-				String groupNum =userBasic.get("GroupNum").toString();
-				
+
+				String groupNum = userBasic.get("GroupNum").toString();
+
 				if (!unumber.startsWith("00") || !groupNum.startsWith("902022")) {
 					LOGGER.info("跳过用户资料：unumber：{}，groupNum：{}", unumber, groupNum);
 					continue;
 				}
-				
+
 				String userId = "80000"
 						+ (unumber.length() > 4 ? unumber.substring(unumber.length() - 4, unumber.length()) : unumber);
 
@@ -941,7 +950,7 @@ public class CDLXhandler implements Handler {
 				userInfoMap.put("createDate", CREATE_DATE);
 				userInfoMap.put("platformId", PLATFORM_ID);
 				userInfoMap.put("dataFrom", PLATFORM_ID);
-				
+
 				customerattrMap.put("userId", userId);
 				customerattrMap.put("userAddr", userBasic.get("Uaddress").toString());
 				customerattrMap.put("userProperty", "1");// 默认已注册
